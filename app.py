@@ -28,9 +28,14 @@ client = Client(scope=scope,creds=credentials)
 spread = Spread(spreadsheet_name,client = client)
 spreadsheet = client.open(spreadsheet_name)
 
+page_title = "Income and Expense Tracker"
+page_icon = "💸"
+st.set_page_config(page_title=page_title, page_icon=page_icon, layout="centered")
+st.title(page_title + " " + page_icon)
+
 # --------------- VARIABLES --------------------- #
 categories = ["", "Expense", "Income"]
-subcategories = ["", "Utilities", "Dogs", "Car", "Other Expenses"]
+subcategories = ["", "Salary", "Utilities", "Dogs", "Car", "Other Expenses"]
 
 # --------------- FUNCTIONS --------------------- #
 # Get the sheet as dataframe
@@ -54,8 +59,7 @@ def create_new_entry(date, category, subcategory, detail, amount):
 
 # ----------------------------------------------- #
 
-
-st.header(f"Data Entry")
+st.header("Data Entry")
 with st.form("entry_form", clear_on_submit=True):
 
     date = st.date_input("Date", datetime.today())
@@ -76,4 +80,22 @@ with st.form("entry_form", clear_on_submit=True):
         except:
             st.error("Something went wrong! 😔")
 
+st.header("Data Visualization")
+with st.form("saved_periods"):
+        df = load_the_spreadsheet(worksheet_name)
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['Month_Year'] = df['Date'].dt.strftime('%b-%Y')
+        periods = df['Month_Year'].unique().tolist()
 
+        period = st.multiselect("Select Period:",periods)
+        submitted = st.form_submit_button("Plot Period")
+        if submitted:
+            df_filtered = df[df['Month_Year'].isin(period)]
+            # Create metrics
+            total_income = df_filtered.loc[df_filtered['Category'] == 'Income', 'Amount'].sum()
+            total_expense = df_filtered.loc[df_filtered['Category'] == 'Expense', 'Amount'].sum()
+            balance = total_income - total_expense
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total Income", f"{total_income}")
+            col2.metric("Total Expense", f"{total_expense} ")
+            col3.metric("Balance", f"{balance}")
