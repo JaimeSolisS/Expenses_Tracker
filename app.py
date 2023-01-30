@@ -90,12 +90,45 @@ with st.form("saved_periods"):
         period = st.multiselect("Select Period:",periods)
         submitted = st.form_submit_button("Plot Period")
         if submitted:
+            # filter data by period
             df_filtered = df[df['Month_Year'].isin(period)]
+
+            # get data 
+            incomes = df_filtered.loc[df_filtered['Category'] == 'Income']
+            expenses = df_filtered.loc[df_filtered['Category'] == 'Expense']
+
             # Create metrics
-            total_income = df_filtered.loc[df_filtered['Category'] == 'Income', 'Amount'].sum()
-            total_expense = df_filtered.loc[df_filtered['Category'] == 'Expense', 'Amount'].sum()
+            total_income = incomes["Amount"].sum()
+            total_expense = expenses["Amount"].sum()
             balance = total_income - total_expense
             col1, col2, col3 = st.columns(3)
             col1.metric("Total Income", f"{total_income}")
-            col2.metric("Total Expense", f"{total_expense} ")
+            col2.metric("Total Expense", f"{total_expense}")
             col3.metric("Balance", f"{balance}")
+
+            # Sum total by cateogry and Create Dictionaries for sankey
+            incomes_dict = incomes.groupby("Subcategory").sum().reset_index()
+            expenses_dict = expenses.groupby("Subcategory").sum().reset_index()
+            incomes_dict=incomes_dict.set_index('Subcategory').T.to_dict('list')
+            expenses_dict=expenses_dict.set_index('Subcategory').T.to_dict('list')
+            
+             # Create sankey chart
+            label = list(incomes_dict.keys()) + ["Total Income"] + list(expenses_dict.keys())
+            source = list(range(len(incomes_dict))) + [len(incomes_dict)] * len(expenses_dict)
+            target = [len(incomes_dict)] * len(incomes_dict) + [label.index(expense) for expense in expenses_dict.keys()]
+            value = list(incomes_dict.values()) + list(expenses_dict.values())
+
+            # Data to dict, dict to sankey
+            link = dict(source=source, target=target, value=value)
+            node = dict(label=label, pad=20, thickness=30)
+            data = go.Sankey(link=link, node=node)
+
+            # Plot
+            fig = go.Figure(data)
+            fig.update_layout(margin=dict(l=0, r=0, t=5, b=5))
+            st.plotly_chart(fig, use_container_width=True)
+
+            st.subheader("Incomes:")
+            st.dataframe(incomes[['Date', 'Subcategory', 'Detail', 'Amount']].reset_index(drop=True))
+            st.subheader("Expenses:")
+            st.dataframe(expenses[['Date', 'Subcategory', 'Detail', 'Amount']].reset_index(drop=True))
